@@ -1,0 +1,101 @@
+'''
+思路和结构学习于 SCDN的SameWorld大佬  源码链接如下
+https://git.oschina.net/XPSWorld/get_txt.git
+博客链接如下
+https://blog.csdn.net/baidu_26678247/article/details/75086587
+'''
+# 但是目前这是一个失败的练习。并没有达成目的。需改进
+
+import requests    #get请求
+import os    #系统
+import time    #时间
+from bs4 import BeautifulSoup    #网页解析
+import re    #正则
+import sys
+
+
+#coding:utf-8
+
+#制作一个请求头字典
+req_header = {
+    'Accept' : 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+    'Accept-Encoding' : 'gzip, deflate',
+    'Accept-Language' : 'en,zh-CN;q=0.9,zh;q=0.8,en-CN;q=0.7',
+    'Cookie' : '_abcde_qweasd=0; BAIDU_SSP_lcr=https://www.baidu.com/link?url=yPBZc-hAeLj6pBO_GMusTQPsGWclXdBqdOqoGTgEuei&wd=&eqid=e01d3340002749f8000000035f807d7c; _abcde_qweasd=0; Hm_lvt_169609146ffe5972484b0957bd1b46d6=1602256116; bdshare_firstime=1602256116116; Hm_lpvt_169609146ffe5972484b0957bd1b46d6=1602256174',
+    'Host' : 'www.xbiquge.la',
+    'Referer' : 'http://www.xbiquge.la/modules/article/waps.php',
+    'Upgrade-Insecure-Requests' : 'Upgrade-Insecure-Requests',
+    'User-Agent' : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.75 Safari/537.36'
+}
+
+'''
+id = 小说编号
+title = 小说题目
+first_page = 第一章页面
+txt_section = 章节地址
+section_name = 章节名称
+section_text = 章节正文
+section_ct = 章节页数
+'''
+
+req_url_1 = 'http://www.xbiquge.la'    #小说主地址
+req_url = req_url_1 + "/14/14704/"    #某一本小说的地址
+txt_section = '6498521.html'    #某一章页面地址
+
+def get_txt(txt_id):
+    txt = {}
+    txt['title'] = ''
+    txt['id'] = str(txt_id)
+    try:
+        txt['id'] = ['/14/14704']
+        req_url = req_url_1+ txt['id']+ '/'    #根据小说编号获取
+        r = requests.get(req_url,params=req_header)
+        soup = BeautifulSoup(r.text, "html.parser")
+        #获取小说题目
+        txt['title'] = soup.select('#wrapper .box_con .maininfo .info#h1')[0].text
+        txt['author'] = soup.select('#wrapper .box_con .maininfo .info#p')
+        txt['anthor'] = txt['anthor'][0].text
+        #获取小说所有章节信息
+        first_page = soup.select('#wrapper .box_con #list dl dd a')
+        #小说总章页面数
+        section_ct = len(first_page)
+        #第一章页面信息
+        first_page = first_page[0]['href'].split('/')[3]
+        #设置现在下载小说章节页面
+        txt_section = first_page
+        #打开小说文件 写入信息
+        fo = open('1.txt.doenload'.format(txt['id'],txt['title']),"ab+")
+        fo.write((txt['title'] + "\r\n").encode('UTF-8'))
+        fo.write((txt['anthor'] + "\r\n").encode('UTF-8'))
+        #循环，写入每章内容
+        while(1):
+            try:
+                #请求当前章节页面  params为请求参数
+                r = requests.get(req_url+str(txt_section),params=req_header)
+                # soup转换
+                soup = BeautifulSoup(r.text,"html.parser")
+                # 获取章节名称
+                section_name = soup.select('#wrapper .centent_read .box_con .bookname#h1')[1:]
+                section_text = soup.select('#wrapper .centent_read .box_con .content')[1].text
+                # 按照指定格式替换章节内容 用正则
+                section_text = re.sub('\s+', '\r\n\t', section_text.text).strip('\r\n')
+                # 下一章地址
+                txt_section = soup.select('#wrapper .centent_read .box_con .bottem2 A3')[0]['href']
+                #判断是否是最后一章，是，则跳出循环
+                if(txt_section == './'):
+                    break
+                # 二进制写入章节名
+                fo.write(('\r'+section_name.text+'\r\n').encode('UTF08'))
+                # 二进制写入内容
+                fo.write((section_text).encode('UTF-8'))
+                print(txt['title']+'章节：'+section_name.text+'   已下载')
+            except:
+                print("小说名：《txt['title']》 章节下载失败")
+        fo.close()
+        os.rename('1.txt.download'.format(txt['id'],txt['title']),'1.txt'.format(txt['id'],txt['title']))
+    except:
+        fo_err = open('dowload.log',"ab+")
+    finally:
+        fo_err.close()
+
+get_txt(14704)
